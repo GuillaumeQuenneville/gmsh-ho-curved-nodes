@@ -5,9 +5,9 @@ For a curved isoparametric element of order k, optimal convergence needs the
 element map T to satisfy |D^m T| <= C h^m for m <= k (Ciarlet & Raviart, 1972).
 This script meshes the unit sphere at several sizes, calls setOrder(k), and
 measures how the k-th derivative of T scales with h on the tetrahedra that have
-a high-order node on the sphere. It then reports, at the finest size, which of
-the other high-order nodes of those tetrahedra gmsh left at their straight-sided
-(affine) position.
+a high-order node on the sphere, and on the boundary triangles alone. It then
+reports, at the finest size, which of the other high-order nodes of those
+tetrahedra gmsh left at their straight-sided (affine) position.
 
 With --control, the high-order nodes are placed on straight edges
 (Mesh.SecondOrderLinear = 1) and every node is then moved by the smooth map
@@ -43,10 +43,10 @@ def mesh_sphere(h: float, order: int, optimize: int, linear: bool) -> None:
     gmsh.model.mesh.setOrder(order)
 
 
-def tetrahedra(order: int) -> tuple[np.ndarray, np.ndarray, int]:
-    """Node coordinates of every tetrahedron, (ne, nn, 3), their node tags,
-    (ne, nn), and the element type."""
-    etype = gmsh.model.mesh.getElementType("Tetrahedron", order)
+def elements(name: str, order: int) -> tuple[np.ndarray, np.ndarray, int]:
+    """Node coordinates of every element of a family ("Tetrahedron" or
+    "Triangle"), (ne, nn, 3), their node tags, (ne, nn), and the element type."""
+    etype = gmsh.model.mesh.getElementType(name, order)
     _, node_tags = gmsh.model.mesh.getElementsByType(etype)
     tags, coords, _ = gmsh.model.mesh.getNodes()
     xyz = np.zeros((int(tags.max()) + 1, 3))
@@ -65,15 +65,16 @@ def on_sphere(conn: np.ndarray) -> np.ndarray:
     return np.isin(conn, np.concatenate(bnd))
 
 
-def max_derivative(X: np.ndarray, etype: int, m: int) -> np.ndarray:
-    """Largest component of D^m T in each element, for maps of degree m.
+def max_derivative(X: np.ndarray, etype: int, m: int, dim: int = 3) -> np.ndarray:
+    """Largest component of D^m T in each element, for maps of degree m from a
+    reference element of dimension `dim`.
 
     D^m T is constant for a map of degree m, and a forward difference of order
     m is exact for it whatever the step.
     """
-    p0, s = np.full(3, 0.1), 0.1
+    p0, s = np.r_[np.full(dim, 0.1), np.zeros(3 - dim)], 0.1
     out = np.zeros(len(X))
-    for dirs in itertools.combinations_with_replacement(range(3), m):
+    for dirs in itertools.combinations_with_replacement(range(dim), m):
         pts, signs = [], []
         for steps in itertools.product((0, 1), repeat=m):
             p = p0.copy()
@@ -119,21 +120,30 @@ def node_report(X: np.ndarray, etype: int, curved: np.ndarray, bnd: np.ndarray):
 
 def table(k: int, sizes: list[float], optimize: int, control: bool) -> None:
     """Prints the scaling of |D^k T| and the node report for one order."""
-    print(f"\norder {k}: median over curved tets of max |D^{k} T|")
-    print(f"{'h':>6} {'tets':>8} {'curved':>7} {'|D^k T|':>10} {'rate':>6}")
+    print(f"\norder {k}: median of max |D^{k} T| over the curved tets and over")
+    print("the boundary triangles")
+    print(f"{'h':>6} {'tets':>8} {'curved':>7} {'|D^k T|':>10} {'rate':>6}"
+          f" {'triangles':>10} {'|D^k T|':>10} {'rate':>6}")
     prev = None
     for h in sizes:
         mesh_sphere(h, k, optimize, linear=control)
-        X, conn, etype = tetrahedra(k)
+        X, conn, etype = elements("Tetrahedron", k)
+        Xt, _, ttype = elements("Triangle", k)
         bnd = on_sphere(conn)
         curved = bnd[:, 4:].any(1)  # a high-order node on the sphere
         if control:
             X = X + 0.1 * np.sin(2 * X)
-        d = float(np.median(max_derivative(X[curved], etype, k)))
-        rate = ""
+            Xt = Xt + 0.1 * np.sin(2 * Xt)
+        d = (
+            float(np.median(max_derivative(X[curved], etype, k))),
+            float(np.median(max_derivative(Xt, ttype, k, dim=2))),
+        )
+        rate = ["", ""]
         if prev is not None:
-            rate = f"{math.log(prev[1] / d) / math.log(prev[0] / h):6.2f}"
-        print(f"{h:6.3f} {len(X):8d} {int(curved.sum()):7d} {d:10.3e} {rate:>6}")
+            rate = [f"{math.log(p / q) / math.log(prev[0] / h):6.2f}"
+                    for p, q in zip(prev[1], d)]
+        print(f"{h:6.3f} {len(X):8d} {int(curved.sum()):7d} {d[0]:10.3e} {rate[0]:>6}"
+              f" {len(Xt):10d} {d[1]:10.3e} {rate[1]:>6}")
         prev = (h, d)
     print(f"expected rate: {k}")
     print(f"high-order nodes of curved tets not on the sphere (h = {h}):")
