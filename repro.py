@@ -14,9 +14,14 @@ With --control, the high-order nodes are placed on straight edges
 x -> x + 0.1 sin(2 x). Those element maps interpolate one smooth map, so
 |D^k T| must scale like h^k: this checks the measurement itself.
 
+With --extension, gmsh's vertices, edge nodes and nodes on the sphere are kept,
+and the interior-face and volume nodes of the curved tetrahedra are recomputed
+from a degree-preserving (Szabo-Babuska) extension of the displacement of the
+others: a candidate replacement for gmsh's inner node placement.
+
 Usage:
     python repro.py [--orders 2 3 4] [--sizes 0.4 0.2 0.1]
-                    [--optimize 0 [1 ...]] [--control]
+                    [--optimize 0 [1 ...]] [--control | --extension]
 """
 
 from __future__ import annotations
@@ -90,6 +95,61 @@ def max_derivative(X: np.ndarray, etype: int, m: int, dim: int = 3) -> np.ndarra
     return out
 
 
+def polynomial_extension(X: np.ndarray, etype: int, k: int, bnd: np.ndarray):
+    """Recomputes the interior-face and volume nodes of tetrahedra from a
+    degree-preserving extension of the displacement of their other nodes.
+
+    The displacement d = x - (affine position) of the edge nodes is fitted on
+    each edge with the Szabo-Babuska forms l_a l_b (l_b - l_a)^j, j <= k - 2,
+    and on each boundary face (all its nodes on the sphere) the remainder is
+    fitted with l_a l_b l_c l_b^i l_c^j, i + j <= k - 3, where the l are
+    barycentric coordinates. A quadratic edge displacement therefore stays
+    quadratic inside the element. Two neighbours get the same nodes on their
+    shared face, since on a face only that face's own forms are nonzero. The
+    new positions are a fixed linear combination of the kept ones, like gmsh's.
+
+    Args:
+        X: node coordinates of the tetrahedra, (ne, nn, 3).
+        etype: gmsh element type.
+        k: order.
+        bnd: whether each node lies on the sphere, (ne, nn).
+
+    Returns:
+        The node coordinates with the interior-face and volume nodes replaced.
+    """
+    ref = np.reshape(gmsh.model.mesh.getElementProperties(etype)[4], (-1, 3))
+    lam = np.c_[1 - ref.sum(1), ref]  # barycentric coordinates of the nodes
+    supp = [tuple(np.where(l > 1e-9)[0]) for l in lam]
+    A = np.einsum("ni,eic->enc", lam, X[:, :4])  # affine positions
+    ext = np.zeros_like(X)
+
+    def fit(basis, idx, values):
+        """Adds to ext the forms fitted to `values` at the nodes `idx`."""
+        c = np.einsum("ij,ejc->eic", np.linalg.inv(basis(lam[idx])), values)
+        ext[:] += np.einsum("nj,ejc->enc", basis(lam), c)
+
+    for a, b in itertools.combinations(range(4), 2):
+        idx = [n for n, s in enumerate(supp) if s == (a, b)]
+        fit(lambda L: np.stack([L[:, a] * L[:, b] * (L[:, b] - L[:, a]) ** j
+                                for j in range(k - 1)], 1), idx, (X - A)[:, idx])
+    new = X.copy()
+    faces = list(itertools.combinations(range(4), 3))
+    for f in faces:  # interior faces: only the edge forms are nonzero there
+        idx = [n for n, s in enumerate(supp) if s == f]
+        rows = np.where(~bnd[:, idx].all(1))[0]
+        new[np.ix_(rows, idx)] = (A + ext)[np.ix_(rows, idx)]
+    if k >= 4:
+        exps = [(i, j) for i in range(k - 2) for j in range(k - 2) if i + j <= k - 3]
+        for a, b, c in faces:
+            idx = [n for n, s in enumerate(supp) if s == (a, b, c)]
+            fit(lambda L: np.stack([L[:, a] * L[:, b] * L[:, c] * L[:, b] ** i
+                                    * L[:, c] ** j for i, j in exps], 1),
+                idx, (new - A - ext)[:, idx])
+        vol = [n for n, s in enumerate(supp) if len(s) == 4]
+        new[:, vol] = (A + ext)[:, vol]
+    return new
+
+
 def node_report(X: np.ndarray, etype: int, curved: np.ndarray, bnd: np.ndarray):
     """Share of straight-placed nodes among the high-order nodes of the curved
     elements that are not on the sphere, by the entity they lie on.
@@ -118,7 +178,9 @@ def node_report(X: np.ndarray, etype: int, curved: np.ndarray, bnd: np.ndarray):
                 yield what, int(sel.sum()), float(straight[:, cols][sel].mean())
 
 
-def table(k: int, sizes: list[float], optimize: int, control: bool) -> None:
+def table(
+    k: int, sizes: list[float], optimize: int, control: bool, extension: bool
+) -> None:
     """Prints the scaling of |D^k T| and the node report for one order."""
     print(f"\norder {k}: median of max |D^{k} T| over the curved tets and over")
     print("the boundary triangles")
@@ -134,6 +196,8 @@ def table(k: int, sizes: list[float], optimize: int, control: bool) -> None:
         if control:
             X = X + 0.1 * np.sin(2 * X)
             Xt = Xt + 0.1 * np.sin(2 * Xt)
+        if extension:
+            X[curved] = polynomial_extension(X[curved], etype, k, bnd[curved])
         d = (
             float(np.median(max_derivative(X[curved], etype, k))),
             float(np.median(max_derivative(Xt, ttype, k, dim=2))),
@@ -159,7 +223,11 @@ def main() -> None:
     ap.add_argument(
         "--optimize", type=int, nargs="+", default=[0], help="Mesh.HighOrderOptimize"
     )
-    ap.add_argument("--control", action="store_true", help="smooth-map control")
+    group = ap.add_mutually_exclusive_group()
+    group.add_argument("--control", action="store_true", help="smooth-map control")
+    group.add_argument(
+        "--extension", action="store_true", help="polynomial extension of the nodes"
+    )
     args = ap.parse_args()
 
     gmsh.initialize()
@@ -168,9 +236,11 @@ def main() -> None:
         head = f"gmsh {gmsh.__version__}, Mesh.HighOrderOptimize = {optimize}"
         if args.control:
             head += ", CONTROL: straight nodes moved by a smooth map"
+        if args.extension:
+            head += ", EXTENSION: interior nodes from the polynomial extension"
         print(head)
         for k in args.orders:
-            table(k, args.sizes, optimize, args.control)
+            table(k, args.sizes, optimize, args.control, args.extension)
         print()
     gmsh.finalize()
 

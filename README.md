@@ -7,7 +7,9 @@ $`\lvert D^m T \rvert \le C h^m`$ and caps the $`H^1`$ convergence rate of
 isoparametric finite elements at about $`h^{5/2}`$ for every $`k \ge 3`$.
 Order 2 is fine, and so are the boundary triangles
 themselves at every order: the defect is in how the boundary curvature is
-carried into the tetrahedra. [Background](#background) explains the terms.
+carried into the tetrahedra. A degree-preserving replacement for gmsh's
+inner-node weights restores the rates ([What fixes it](#what-fixes-it)), and
+[Background](#background) explains the terms.
 
 With [pixi](https://pixi.sh) (gmsh 4.15.2 from conda-forge, pinned in `pixi.lock`):
 
@@ -16,7 +18,8 @@ pixi run repro     # unit ball, orders 2-4, h = 0.4, 0.2, 0.1 (a few seconds)
 pixi run control   # same meshes, straight nodes moved by a smooth map
 pixi run fine      # order 3 down to h = 0.05
 pixi run optimize  # order 3 with Mesh.HighOrderOptimize = 0..4: same result
-pixi run outputs   # regenerate output.txt and output-control.txt
+pixi run extension # interior nodes recomputed by a polynomial extension (the fix)
+pixi run outputs   # regenerate the three output files
 ```
 
 Or with pip: `pip install -r requirements.txt`, then `python repro.py --help`.
@@ -41,14 +44,15 @@ Or with pip: `pip install -r requirements.txt`, then `python repro.py --help`.
 
 ## Results (gmsh 4.15.2, Linux)
 
-Full output: [`output.txt`](output.txt) and [`output-control.txt`](output-control.txt).
+Full output: [`output.txt`](output.txt), [`output-control.txt`](output-control.txt)
+and [`output-extension.txt`](output-extension.txt).
 Rates of $`\lvert D^k T \rvert`$, each cell giving the rate for $`h`$ from 0.4 → 0.2, then 0.2 → 0.1:
 
-| $`k`$ | tetrahedra (gmsh nodes) | boundary triangles (gmsh nodes) | tetrahedra (control) | expected |
-|---|---|---|---|---|
-| 2 | 2.07, 1.97 | 2.03, 2.01 | 1.93, 1.97 | 2 |
-| 3 | 2.28, 2.04 (0.1 → 0.05: 1.98) | 3.02, 2.98 | 3.19, 3.07 | 3 |
-| 4 | 2.15, 1.99 | 4.07, 3.99 | 4.11, 3.96 | 4 |
+| $`k`$ | tetrahedra (gmsh nodes) | boundary triangles (gmsh nodes) | tetrahedra (control) | tetrahedra (extension) | expected |
+|---|---|---|---|---|---|
+| 2 | 2.07, 1.97 | 2.03, 2.01 | 1.93, 1.97 | 2.07, 1.97 | 2 |
+| 3 | 2.28, 2.04 (0.1 → 0.05: 1.98) | 3.02, 2.98 | 3.19, 3.07 | 3.06, 2.97 | 3 |
+| 4 | 2.15, 1.99 | 4.07, 3.99 | 4.11, 3.96 | 4.08, 3.95 | 4 |
 
 Where gmsh places the other high-order nodes of the curved tetrahedra:
 - **Interior edges:** every node on them is at its straight position.
@@ -149,11 +153,31 @@ to the face and volume nodes.
 
 ### What fixes it
 
-Place every node that is not on a boundary entity by a polynomial extension of
-the boundary displacement, using the edge and face blending functions of
-Szabó–Babuška or Lenoir's construction.
-- In a sphere-only prototype, this gave $`\lvert D^3 T \rvert \sim h^{3.06}`$.
-- It also gave optimal $`H^1`$ rates: 3.36 at $`k = 3`$ and 4.72 at $`k = 4`$.
+gmsh places the interior face and volume nodes with fixed weights from
+`getInnerVertexPlacement` (`src/numeric/InnerVertexPlacement.cpp`): a linear
+transfinite blend of the element's boundary nodes. That blend does not
+reproduce a quadratic edge displacement. For the bump $`\lambda_1 \lambda_2`$ on
+one edge of an order-3 triangle, it puts the face node at 0.148 instead of the
+polynomial's 0.111.
+
+`--extension` keeps gmsh's vertices, edge nodes and boundary nodes, and
+recomputes the interior face and volume nodes from a degree-preserving
+extension:
+- **Edges:** each edge's displacement is fitted with the Szabó–Babuška forms
+  $`\lambda_a \lambda_b (\lambda_b - \lambda_a)^j`$, $`j \le k-2`$.
+- **Boundary faces:** what remains is fitted with
+  $`\lambda_a \lambda_b \lambda_c \, \lambda_b^i \lambda_c^j`$,
+  $`i + j \le k-3`$.
+
+A quadratic displacement then stays quadratic inside the element, and the rates
+become $`k`$ (last column above). Like gmsh's rule, the new nodes are a fixed
+linear combination of the others for each order. Neighbours get the same nodes
+on a shared face, to round-off. The elements stay valid: on the coarsest mesh,
+the smallest $`\det J`$ relative to the affine element is 0.893 against gmsh's
+0.881 at $`k = 3`$, and 0.861 against 0.858 at $`k = 4`$.
+
+A similar construction in our isoparametric solver gave optimal $`H^1`$ rates:
+3.36 at $`k = 3`$ and 4.72 at $`k = 4`$.
 
 ### References
 

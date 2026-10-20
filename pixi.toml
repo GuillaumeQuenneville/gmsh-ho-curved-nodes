@@ -13,9 +13,11 @@ numpy = "*"
 repro = "python repro.py"
 # same meshes, straight nodes moved by a smooth map: rates must be k
 control = "python repro.py --control"
+# interior nodes recomputed by the polynomial extension: rates must be k
+extension = "python repro.py --extension"
 # one more level at order 3 (about 150k tets)
 fine = "python repro.py --orders 3 --sizes 0.2 0.1 0.05"
 # every Mesh.HighOrderOptimize value at order 3: all give the same nodes
 optimize = "python repro.py --orders 3 --optimize 0 1 2 3 4"
 # regenerate the saved outputs
-outputs = "python repro.py > output.txt && python repro.py --control > output-control.txt"
+outputs = "python repro.py > output.txt && python repro.py --control > output-control.txt && python repro.py --extension > output-extension.txt"

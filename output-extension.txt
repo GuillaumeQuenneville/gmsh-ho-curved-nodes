@@ -1,0 +1,41 @@
+gmsh 4.15.2, Mesh.HighOrderOptimize = 0, EXTENSION: interior nodes from the polynomial extension
+
+order 2: median of max |D^2 T| over the curved tets and over
+the boundary triangles
+     h     tets  curved    |D^k T|   rate  triangles    |D^k T|   rate
+ 0.400      333     277  1.293e-01               198  1.339e-01       
+ 0.200     2694    1363  3.072e-02   2.07        820  3.274e-02   2.03
+ 0.100    19786    5538  7.819e-03   1.97       3152  8.134e-03   2.01
+expected rate: 2
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 2386, 100% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 19000, 100% at the straight position
+
+order 3: median of max |D^3 T| over the curved tets and over
+the boundary triangles
+     h     tets  curved    |D^k T|   rate  triangles    |D^k T|   rate
+ 0.400      333     277  1.549e-01               198  1.605e-01       
+ 0.200     2694    1363  1.862e-02   3.06        820  1.977e-02   3.02
+ 0.100    19786    5538  2.371e-03   2.97       3152  2.510e-03   2.98
+expected rate: 3
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 4772, 100% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 38000, 100% at the straight position
+  face nodes, 1 of the face's 3 vertices on the sphere: 4772, 100% at the straight position
+  face nodes, 2 of the face's 3 vertices on the sphere: 14228, 0% at the straight position
+
+order 4: median of max |D^4 T| over the curved tets and over
+the boundary triangles
+     h     tets  curved    |D^k T|   rate  triangles    |D^k T|   rate
+ 0.400      333     277  1.796e-01               198  1.957e-01       
+ 0.200     2694    1363  1.063e-02   4.08        820  1.162e-02   4.07
+ 0.100    19786    5538  6.886e-04   3.95       3152  7.308e-04   3.99
+expected rate: 4
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 7158, 100% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 57000, 100% at the straight position
+  face nodes, 1 of the face's 3 vertices on the sphere: 14316, 100% at the straight position
+  face nodes, 2 of the face's 3 vertices on the sphere: 42684, 0% at the straight position
+  volume nodes, 2 of the volume's 4 vertices on the sphere: 2386, 0% at the straight position
+  volume nodes, 3 of the volume's 4 vertices on the sphere: 3152, 0% at the straight position
+
