@@ -1,0 +1,38 @@
+gmsh 4.15.2, Mesh.HighOrderOptimize = 0
+
+order 2: median over curved tets of max |D^2 T|
+     h     tets  curved    |D^k T|   rate
+ 0.400      333     277  1.293e-01       
+ 0.200     2694    1363  3.072e-02   2.07
+ 0.100    19786    5538  7.819e-03   1.97
+expected rate: 2
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 2386, 100% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 19000, 100% at the straight position
+
+order 3: median over curved tets of max |D^3 T|
+     h     tets  curved    |D^k T|   rate
+ 0.400      333     277  1.636e-01       
+ 0.200     2694    1363  3.373e-02   2.28
+ 0.100    19786    5538  8.180e-03   2.04
+expected rate: 3
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 4772, 100% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 38000, 100% at the straight position
+  face nodes, 1 of the face's 3 vertices on the sphere: 4772, 100% at the straight position
+  face nodes, 2 of the face's 3 vertices on the sphere: 14228, 0% at the straight position
+
+order 4: median over curved tets of max |D^4 T|
+     h     tets  curved    |D^k T|   rate
+ 0.400      333     277  6.905e-01       
+ 0.200     2694    1363  1.553e-01   2.15
+ 0.100    19786    5538  3.921e-02   1.99
+expected rate: 4
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 7158, 100% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 57000, 100% at the straight position
+  face nodes, 1 of the face's 3 vertices on the sphere: 14316, 100% at the straight position
+  face nodes, 2 of the face's 3 vertices on the sphere: 42684, 0% at the straight position
+  volume nodes, 2 of the volume's 4 vertices on the sphere: 2386, 0% at the straight position
+  volume nodes, 3 of the volume's 4 vertices on the sphere: 3152, 0% at the straight position
+

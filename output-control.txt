@@ -1,0 +1,38 @@
+gmsh 4.15.2, Mesh.HighOrderOptimize = 0, CONTROL: straight nodes moved by a smooth map
+
+order 2: median over curved tets of max |D^2 T|
+     h     tets  curved    |D^k T|   rate
+ 0.400      333     277  7.884e-02       
+ 0.200     2694    1363  2.072e-02   1.93
+ 0.100    19786    5538  5.298e-03   1.97
+expected rate: 2
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 2386, 0% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 19000, 0% at the straight position
+
+order 3: median over curved tets of max |D^3 T|
+     h     tets  curved    |D^k T|   rate
+ 0.400      333     277  4.737e-02       
+ 0.200     2694    1363  5.175e-03   3.19
+ 0.100    19786    5538  6.142e-04   3.07
+expected rate: 3
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 4772, 0% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 38000, 0% at the straight position
+  face nodes, 1 of the face's 3 vertices on the sphere: 4772, 0% at the straight position
+  face nodes, 2 of the face's 3 vertices on the sphere: 14228, 0% at the straight position
+
+order 4: median over curved tets of max |D^4 T|
+     h     tets  curved    |D^k T|   rate
+ 0.400      333     277  8.211e-02       
+ 0.200     2694    1363  4.759e-03   4.11
+ 0.100    19786    5538  3.051e-04   3.96
+expected rate: 4
+high-order nodes of curved tets not on the sphere (h = 0.1):
+  edge nodes, 0 of the edge's 2 vertices on the sphere: 7158, 0% at the straight position
+  edge nodes, 1 of the edge's 2 vertices on the sphere: 57000, 0% at the straight position
+  face nodes, 1 of the face's 3 vertices on the sphere: 14316, 0% at the straight position
+  face nodes, 2 of the face's 3 vertices on the sphere: 42684, 0% at the straight position
+  volume nodes, 2 of the volume's 4 vertices on the sphere: 2386, 0% at the straight position
+  volume nodes, 3 of the volume's 4 vertices on the sphere: 3152, 0% at the straight position
+
